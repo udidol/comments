@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import * as bcrypt from "bcrypt";
+import * as bcrypt from "bcryptjs";
 import { DatabaseService } from "../database/database.service";
 
 interface User {
@@ -24,23 +24,19 @@ export class AuthService {
 
   async validateUser(
     username: string,
-    password: string
+    pass: string
   ): Promise<Omit<User, "password_hash"> | null> {
-    const user = this.db.get<User>("SELECT * FROM users WHERE username = ?", [
-      username,
-    ]);
+    const user = await this.db.get<User>(
+      "SELECT * FROM users WHERE username = ?",
+      [username]
+    );
 
-    if (!user) {
-      return null;
+    if (user && bcrypt.compareSync(pass, user.password_hash)) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password_hash, ...result } = user;
+      return result;
     }
-
-    const isValid = await bcrypt.compare(password, user.password_hash);
-    if (!isValid) {
-      return null;
-    }
-
-    const { password_hash: _, ...result } = user;
-    return result;
+    return null;
   }
 
   async login(username: string, password: string) {
@@ -62,9 +58,15 @@ export class AuthService {
     };
   }
 
-  findUserById(id: number): Omit<User, "password_hash"> | null {
-    const user = this.db.get<User>("SELECT * FROM users WHERE id = ?", [id]);
+  async findUserById(
+    id: number
+  ): Promise<Omit<User, "password_hash"> | null> {
+    const user = await this.db.get<User>(
+      "SELECT * FROM users WHERE id = ?",
+      [id]
+    );
     if (!user) return null;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password_hash: _, ...result } = user;
     return result;
   }

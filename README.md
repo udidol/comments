@@ -4,7 +4,7 @@ A Figma-like web application featuring an infinite canvas with a collaborative c
 
 ## Tech Stack
 
-- **Backend**: NestJS, SQLite (better-sqlite3), Passport JWT, Throttler
+- **Backend**: NestJS, SQLite (sqlite3), Passport JWT, Throttler
 - **Frontend**: React, TypeScript, Zustand, TanStack Query, styled-components
 - **Shared**: TypeScript types between frontend and backend
 

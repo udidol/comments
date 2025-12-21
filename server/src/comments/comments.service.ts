@@ -34,11 +34,11 @@ const DEFAULT_FILE_ID = "default";
 export class CommentsService {
   constructor(private readonly db: DatabaseService) {}
 
-  findAll(page: number = 1, pageSize: number = 50) {
+  async findAll(page: number = 1, pageSize: number = 50) {
     const offset = (page - 1) * pageSize;
 
     // Fetch paginated main comments
-    const comments = this.db.all<CommentWithUser>(
+    const comments = await this.db.all<CommentWithUser>(
       `SELECT c.*, u.username
        FROM comments c
        JOIN users u ON c.user_id = u.id
@@ -51,7 +51,7 @@ export class CommentsService {
     const commentIds = comments.map((c) => c.id);
     let replies: CommentWithUser[] = [];
     if (commentIds.length > 0) {
-      replies = this.db.all<CommentWithUser>(
+      replies = await this.db.all<CommentWithUser>(
         `SELECT c.*, u.username
          FROM comments c
          JOIN users u ON c.user_id = u.id
@@ -81,7 +81,7 @@ export class CommentsService {
     );
 
     // For pagination, we count only main comments
-    const countResult = this.db.get<{ total: number }>(
+    const countResult = await this.db.get<{ total: number }>(
       "SELECT COUNT(*) as total FROM comments WHERE file_id = ? AND type = 'comment'",
       [DEFAULT_FILE_ID]
     );
@@ -97,13 +97,13 @@ export class CommentsService {
     };
   }
 
-  create(userId: number, createCommentDto: CreateCommentDto) {
+  async create(userId: number, createCommentDto: CreateCommentDto) {
     const type = createCommentDto.type || "comment";
     const parentId = createCommentDto.parent_id || null;
 
     // If creating a reply, verify the parent exists
     if (type === "reply" && parentId) {
-      const parent = this.db.get<CommentEntity>(
+      const parent = await this.db.get<CommentEntity>(
         "SELECT * FROM comments WHERE id = ?",
         [parentId]
       );
@@ -112,7 +112,7 @@ export class CommentsService {
       }
     }
 
-    const result = this.db.run(
+    const result = await this.db.run(
       `INSERT INTO comments (file_id, user_id, text_content, x_coord, y_coord, type, parent_id)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -126,7 +126,7 @@ export class CommentsService {
       ]
     );
 
-    const comment = this.db.get<CommentWithUser>(
+    const comment = await this.db.get<CommentWithUser>(
       `SELECT c.*, u.username
        FROM comments c
        JOIN users u ON c.user_id = u.id
@@ -137,8 +137,8 @@ export class CommentsService {
     return comment;
   }
 
-  update(id: number, userId: number, updateCommentDto: UpdateCommentDto) {
-    const comment = this.db.get<CommentEntity>(
+  async update(id: number, userId: number, updateCommentDto: UpdateCommentDto) {
+    const comment = await this.db.get<CommentEntity>(
       "SELECT * FROM comments WHERE id = ?",
       [id]
     );
@@ -151,14 +151,14 @@ export class CommentsService {
       throw new ForbiddenException("You can only edit your own comments");
     }
 
-    this.db.run(
+    await this.db.run(
       `UPDATE comments
        SET text_content = ?, date_last_updated = CURRENT_TIMESTAMP
        WHERE id = ?`,
       [updateCommentDto.text_content, id]
     );
 
-    const updated = this.db.get<CommentWithUser>(
+    const updated = await this.db.get<CommentWithUser>(
       `SELECT c.*, u.username
        FROM comments c
        JOIN users u ON c.user_id = u.id
@@ -169,8 +169,8 @@ export class CommentsService {
     return updated;
   }
 
-  delete(id: number, userId: number) {
-    const comment = this.db.get<CommentEntity>(
+  async delete(id: number, userId: number) {
+    const comment = await this.db.get<CommentEntity>(
       "SELECT * FROM comments WHERE id = ?",
       [id]
     );
@@ -185,11 +185,11 @@ export class CommentsService {
 
     // If this is a main comment, also delete all its replies
     if (comment.type === "comment") {
-      this.db.run("DELETE FROM comments WHERE parent_id = ?", [id]);
+      await this.db.run("DELETE FROM comments WHERE parent_id = ?", [id]);
     }
 
     // Delete the comment itself
-    this.db.run("DELETE FROM comments WHERE id = ?", [id]);
+    await this.db.run("DELETE FROM comments WHERE id = ?", [id]);
 
     return { success: true };
   }

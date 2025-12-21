@@ -2,19 +2,18 @@ import {
   Controller,
   Get,
   Post,
-  Put,
+  Patch,
   Delete,
   Body,
   Param,
   Query,
   UseGuards,
   Request,
-  ParseIntPipe,
-} from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CommentsService } from './comments.service';
-import { CreateCommentDto } from './dto/create-comment.dto';
-import { UpdateCommentDto } from './dto/update-comment.dto';
+} from "@nestjs/common";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { CommentsService } from "./comments.service";
+import { CreateCommentDto } from "./dto/create-comment.dto";
+import { UpdateCommentDto } from "./dto/update-comment.dto";
 
 interface AuthenticatedRequest {
   user: {
@@ -23,43 +22,51 @@ interface AuthenticatedRequest {
   };
 }
 
-@Controller('comments')
+@Controller("comments")
 @UseGuards(JwtAuthGuard)
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
   @Get()
-  findAll(
-    @Query('page') page?: string,
-    @Query('page_size') pageSize?: string,
+  async findAll(
+    @Query("page") page: string = "1",
+    @Query("pageSize") pageSize: string = "50"
   ) {
-    const pageNum = page ? parseInt(page, 10) : 1;
-    const size = pageSize ? parseInt(pageSize, 10) : 50;
-    return this.commentsService.findAll(pageNum, size);
+    return await this.commentsService.findAll(
+      parseInt(page, 10),
+      parseInt(pageSize, 10)
+    );
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post()
-  create(
+  async create(
     @Request() req: AuthenticatedRequest,
-    @Body() createCommentDto: CreateCommentDto,
+    @Body() createCommentDto: CreateCommentDto
   ) {
-    return this.commentsService.create(req.user.userId, createCommentDto);
+    return await this.commentsService.create(req.user.userId, createCommentDto);
   }
 
-  @Put(':id')
-  update(
+  @UseGuards(JwtAuthGuard)
+  @Patch(":id")
+  async update(
+    @Param("id") id: string,
     @Request() req: AuthenticatedRequest,
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateCommentDto: UpdateCommentDto,
+    @Body() updateCommentDto: UpdateCommentDto
   ) {
-    return this.commentsService.update(id, req.user.userId, updateCommentDto);
+    return await this.commentsService.update(
+      +id,
+      req.user.userId,
+      updateCommentDto
+    );
   }
 
-  @Delete(':id')
-  delete(
-    @Request() req: AuthenticatedRequest,
-    @Param('id', ParseIntPipe) id: number,
+  @UseGuards(JwtAuthGuard)
+  @Delete(":id")
+  async remove(
+    @Param("id") id: string,
+    @Request() req: AuthenticatedRequest
   ) {
-    return this.commentsService.delete(id, req.user.userId);
+    return await this.commentsService.delete(+id, req.user.userId);
   }
 }

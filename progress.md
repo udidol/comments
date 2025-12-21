@@ -57,10 +57,10 @@ Building a Figma-like web app with an infinite canvas and comment placement feat
   - `server/src/database/database.module.ts` - Global database module
   - `server/src/database/database.service.ts` - SQLite connection and query helpers
 - **Features:**
-  - Uses better-sqlite3 for SQLite
+  - Uses sqlite3 for SQLite
   - Auto-creates tables on startup
   - Seeds test users with password the value of JOINT_PASSWORD from the .env file
-  - bcrypt for password hashing
+  - bcryptjs for password hashing
 
 #### Auth Module
 
@@ -183,64 +183,6 @@ Building a Figma-like web app with an infinite canvas and comment placement feat
 ### Resolved Issues
 
 1. **Static file serving path** - Fixed `ServeStaticModule` path to use `process.cwd()` instead of `__dirname` for reliable path resolution
-
-## Dependencies Installed
-
-### Server
-
-```json
-{
-  "dependencies": {
-    "@nestjs/common": "^10.0.0",
-    "@nestjs/core": "^10.0.0",
-    "@nestjs/jwt": "^10.2.0",
-    "@nestjs/passport": "^10.0.3",
-    "@nestjs/platform-express": "^10.0.0",
-    "@nestjs/serve-static": "^4.0.0",
-    "@nestjs/throttler": "^5.0.0",
-    "bcrypt": "^5.1.1",
-    "better-sqlite3": "^9.4.3",
-    "class-transformer": "^0.5.1",
-    "class-validator": "^0.14.1",
-    "passport": "^0.7.0",
-    "passport-jwt": "^4.0.1",
-    "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.1"
-  },
-  "devDependencies": {
-    "@nestjs/cli": "^10.0.0",
-    "@types/bcrypt": "^5.0.2",
-    "@types/better-sqlite3": "^7.6.8",
-    "@types/node": "^20.11.0",
-    "@types/passport-jwt": "^4.0.1",
-    "@types/supertest": "^6.0.2",
-    "supertest": "^6.3.4",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
-  }
-}
-```
-
-### Client
-
-```json
-{
-  "dependencies": {
-    "@tanstack/react-query": "^5.17.19",
-    "axios": "^1.6.5",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "zustand": "^4.5.0"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.48",
-    "@types/react-dom": "^18.2.18",
-    "@vitejs/plugin-react": "^4.2.1",
-    "typescript": "^5.3.3",
-    "vite": "^5.0.12"
-  }
-}
-```
 
 ## Next Steps
 
