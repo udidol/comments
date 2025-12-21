@@ -1,6 +1,7 @@
-import { useRef, useEffect, useCallback, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
+import { TransformWrapper, TransformComponent, useControls, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { useCanvasStore } from '../store/canvasStore';
 import { useAuthStore } from '../store/authStore';
 import { useComments } from '../api/comments';
@@ -8,37 +9,16 @@ import { Comment } from './Comment';
 import { CommentForm } from './CommentForm';
 import type { Comment as CommentType } from '@shared/types';
 
-// Styled Components
-interface CanvasContainerProps {
-  $commentMode: boolean;
-}
-
-const CanvasContainer = styled.div<CanvasContainerProps>`
+// Container for the entire canvas area
+const CanvasWrapper = styled.div`
   width: 100%;
   height: 100%;
+  position: relative;
   overflow: hidden;
   background: #f5f5f5;
-  position: relative;
-  cursor: ${(props) => (props.$commentMode ? 'crosshair' : 'grab')};
 `;
 
-// Transform layer for the grid background only (scales with zoom)
-interface GridTransformLayerProps {
-  $scale: number;
-  $panX: number;
-  $panY: number;
-}
-
-const GridTransformLayer = styled.div<GridTransformLayerProps>`
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform-origin: 0 0;
-  transform: translate(${(props) => props.$panX}px, ${(props) => props.$panY}px) scale(${(props) => props.$scale});
-  will-change: transform;
-  pointer-events: none;
-`;
-
+// The grid that scales with zoom
 const CanvasGrid = styled.div`
   position: absolute;
   top: -50000px;
@@ -50,6 +30,7 @@ const CanvasGrid = styled.div`
   background-size: 50px 50px;
 `;
 
+// Fixed UI components - these NEVER move with zoom/pan
 const Toolbar = styled.div`
   position: fixed;
   top: 16px;
@@ -76,7 +57,6 @@ const LogoutButton = styled.button`
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
-
   &:hover {
     background: #f5f5f5;
   }
@@ -132,14 +112,13 @@ const AddCommentButton = styled.button<AddCommentButtonProps>`
   cursor: pointer;
   font-size: 16px;
   font-family: inherit;
-
   &:hover {
     background: ${(props) => (props.$active ? '#9061f9' : '#f5f5f5')};
   }
 `;
 
 const Loading = styled.div`
-  position: absolute;
+  position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -148,7 +127,21 @@ const Loading = styled.div`
   z-index: 1;
 `;
 
-// Bubble icon SVG component
+// Overlay for comments - sits on top of the transform layer
+const CommentsOverlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+
+  & > * {
+    pointer-events: auto;
+  }
+`;
+
 function BubbleIcon({ color = 'currentColor' }: { color?: string }) {
   return (
     <svg
@@ -160,36 +153,148 @@ function BubbleIcon({ color = 'currentColor' }: { color?: string }) {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      data-testid="canvas-bubble-icon"
     >
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   );
 }
 
-export function Canvas() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-  const lastMouse = useRef({ x: 0, y: 0 });
+// Inner component that has access to transform controls
+function CanvasContent({
+  mainComments,
+  repliesByParentId,
+  isLoading,
+  scale,
+  positionX,
+  positionY,
+}: {
+  mainComments: CommentType[];
+  repliesByParentId: Map<number, CommentType[]>;
+  isLoading: boolean;
+  scale: number;
+  positionX: number;
+  positionY: number;
+}) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const hasCenteredOnComments = useRef(false);
+  const { setTransform } = useControls();
 
   const {
-    panX,
-    panY,
-    scale,
-    setPan,
-    setScale,
     selectComment,
     setNewCommentPosition,
     newCommentPosition,
     commentMode,
     setCommentMode,
   } = useCanvasStore();
+
+  // Center view on comments when they first load
+  useEffect(() => {
+    if (mainComments.length && !hasCenteredOnComments.current && wrapperRef.current) {
+      hasCenteredOnComments.current = true;
+
+      const minX = Math.min(...mainComments.map(c => c.x_coord));
+      const maxX = Math.max(...mainComments.map(c => c.x_coord));
+      const minY = Math.min(...mainComments.map(c => c.y_coord));
+      const maxY = Math.max(...mainComments.map(c => c.y_coord));
+
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const viewportCenterX = rect.width / 2;
+      const viewportCenterY = rect.height / 2;
+
+      setTransform(viewportCenterX - centerX, viewportCenterY - centerY, 1);
+    }
+  }, [mainComments, setTransform]);
+
+  // Convert canvas coordinates to screen position
+  const toScreenPosition = useCallback((x: number, y: number) => ({
+    x: x * scale + positionX,
+    y: y * scale + positionY,
+  }), [scale, positionX, positionY]);
+
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    // Only handle clicks on the wrapper itself, not children
+    if (e.target !== e.currentTarget) return;
+
+    if (commentMode) {
+      const rect = wrapperRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      // Convert screen position to canvas coordinates
+      const screenX = e.clientX - rect.left;
+      const screenY = e.clientY - rect.top;
+      const canvasX = (screenX - positionX) / scale;
+      const canvasY = (screenY - positionY) / scale;
+
+      setNewCommentPosition({ x: canvasX, y: canvasY });
+      setCommentMode(false);
+    } else {
+      selectComment(null);
+      setNewCommentPosition(null);
+    }
+  };
+
+  return (
+    <CanvasWrapper
+      ref={wrapperRef}
+      onClick={handleCanvasClick}
+      style={{ cursor: commentMode ? 'crosshair' : 'grab' }}
+    >
+      {/* The zoom/pan layer - ONLY contains the grid */}
+      <TransformComponent
+        wrapperStyle={{
+          width: '100%',
+          height: '100%',
+        }}
+        contentStyle={{
+          width: '100%',
+          height: '100%',
+        }}
+      >
+        <CanvasGrid />
+      </TransformComponent>
+
+      {/* Comments overlay - NOT inside TransformComponent */}
+      <CommentsOverlay>
+        {mainComments.map((comment) => {
+          const screenPos = toScreenPosition(comment.x_coord, comment.y_coord);
+          const replies = repliesByParentId.get(comment.id) || [];
+          return (
+            <Comment
+              key={comment.id}
+              comment={comment}
+              replies={replies}
+              screenX={screenPos.x}
+              screenY={screenPos.y}
+            />
+          );
+        })}
+
+        {newCommentPosition && (
+          <CommentForm
+            screenX={toScreenPosition(newCommentPosition.x, newCommentPosition.y).x}
+            screenY={toScreenPosition(newCommentPosition.x, newCommentPosition.y).y}
+          />
+        )}
+      </CommentsOverlay>
+
+      {isLoading && <Loading>Loading comments...</Loading>}
+    </CanvasWrapper>
+  );
+}
+
+export function Canvas() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const { data, isLoading } = useComments();
+  const { commentMode, setCommentMode, setScale, setPan } = useCanvasStore();
 
-  // Organize comments: separate main comments from replies
+  // Local state for transform (synced to store)
+  const [transformState, setTransformState] = useState({ scale: 1, positionX: 0, positionY: 0 });
+
+  // Organize comments
   const { mainComments, repliesByParentId } = useMemo(() => {
     if (!data?.data) return { mainComments: [], repliesByParentId: new Map<number, CommentType[]>() };
 
@@ -209,145 +314,29 @@ export function Canvas() {
     return { mainComments: main, repliesByParentId: replies };
   }, [data?.data]);
 
-  // Center view on comments when they first load
-  useEffect(() => {
-    if (mainComments.length && !hasCenteredOnComments.current && containerRef.current) {
-      hasCenteredOnComments.current = true;
-
-      // Calculate bounding box of main comments only
-      const minX = Math.min(...mainComments.map(c => c.x_coord));
-      const maxX = Math.max(...mainComments.map(c => c.x_coord));
-      const minY = Math.min(...mainComments.map(c => c.y_coord));
-      const maxY = Math.max(...mainComments.map(c => c.y_coord));
-
-      // Center of all comments
-      const centerX = (minX + maxX) / 2;
-      const centerY = (minY + maxY) / 2;
-
-      // Center of viewport
-      const rect = containerRef.current.getBoundingClientRect();
-      const viewportCenterX = rect.width / 2;
-      const viewportCenterY = rect.height / 2;
-
-      // Set pan to center comments in viewport
-      setPan(viewportCenterX - centerX, viewportCenterY - centerY);
-    }
-  }, [mainComments, setPan]);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 0 && !commentMode) {
-      isDragging.current = true;
-      lastMouse.current = { x: e.clientX, y: e.clientY };
-    }
-  };
-
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (isDragging.current) {
-        const dx = e.clientX - lastMouse.current.x;
-        const dy = e.clientY - lastMouse.current.y;
-        setPan(panX + dx, panY + dy);
-        lastMouse.current = { x: e.clientX, y: e.clientY };
-      }
-    },
-    [panX, panY, setPan],
-  );
-
-  const handleMouseUp = useCallback(() => {
-    isDragging.current = false;
-  }, []);
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    // Mouse position relative to container
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    // Calculate new scale (smaller delta = slower zoom)
-    const delta = e.deltaY > 0 ? 0.95 : 1.05;
-    const newScale = Math.max(0.1, Math.min(3, scale * delta));
-
-    // Calculate the canvas point under the cursor
-    const canvasX = (mouseX - panX) / scale;
-    const canvasY = (mouseY - panY) / scale;
-
-    // Adjust pan so the same canvas point stays under the cursor
-    const newPanX = mouseX - canvasX * newScale;
-    const newPanY = mouseY - canvasY * newScale;
-
-    setPan(newPanX, newPanY);
-    setScale(newScale);
-  };
-
-  const handleContainerClick = (e: React.MouseEvent) => {
-    // Only handle clicks directly on the container or grid
-    const target = e.target as HTMLElement;
-    if (e.target !== e.currentTarget && !target.hasAttribute('data-canvas-grid')) {
-      return;
-    }
-
-    if (commentMode) {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-
-      const x = (e.clientX - rect.left - panX) / scale;
-      const y = (e.clientY - rect.top - panY) / scale;
-      setNewCommentPosition({ x, y });
-      setCommentMode(false);
-    } else {
-      selectComment(null);
-      setNewCommentPosition(null);
-    }
-  };
-
   const handleAddCommentClick = () => {
     setCommentMode(true);
   };
 
-  useEffect(() => {
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [handleMouseMove, handleMouseUp]);
+  const handleTransform = (ref: ReactZoomPanPinchRef) => {
+    const { scale, positionX, positionY } = ref.state;
+    setTransformState({ scale, positionX, positionY });
+    setScale(scale);
+    setPan(positionX, positionY);
+  };
 
-  // Calculate screen position from canvas coordinates
-  const toScreenPosition = (x: number, y: number) => ({
-    x: x * scale + panX,
-    y: y * scale + panY,
-  });
+  const zoomPercent = Math.round(transformState.scale * 100);
 
-  // Fixed UI elements rendered via portal to body
-  const zoomPercent = Math.round(scale * 100);
-
+  // Fixed UI - rendered via portal, completely outside transform system
   const fixedUI = createPortal(
     <>
-      {/* Toolbar */}
-      <Toolbar data-testid="canvas-toolbar">
-        <UserInfo data-testid="canvas-user-info">Signed in as {user?.username}</UserInfo>
-        <LogoutButton onClick={logout} data-testid="canvas-logout-button">
-          Sign Out
-        </LogoutButton>
+      <Toolbar>
+        <UserInfo>Signed in as {user?.username}</UserInfo>
+        <LogoutButton onClick={logout}>Sign Out</LogoutButton>
       </Toolbar>
-
-      {/* Zoom level */}
-      <ZoomLevel data-testid="canvas-zoom-level">{zoomPercent}%</ZoomLevel>
-
-      {/* Help text */}
-      <HelpText data-testid="canvas-help-text">Drag to pan | Scroll to zoom</HelpText>
-
-      {/* Add Comment Button */}
-      <AddCommentButton
-        onClick={handleAddCommentClick}
-        $active={commentMode}
-        data-testid="canvas-add-comment-button"
-      >
+      <ZoomLevel>{zoomPercent}%</ZoomLevel>
+      <HelpText>Drag to pan | Scroll to zoom</HelpText>
+      <AddCommentButton onClick={handleAddCommentClick} $active={commentMode}>
         <BubbleIcon color={commentMode ? 'white' : '#888'} />
         <span>Add comment</span>
       </AddCommentButton>
@@ -357,56 +346,27 @@ export function Canvas() {
 
   return (
     <>
-      <CanvasContainer
-        ref={containerRef}
-        $commentMode={commentMode}
-        onMouseDown={handleMouseDown}
-        onWheel={handleWheel}
-        onClick={handleContainerClick}
-        data-testid="canvas-container"
+      <TransformWrapper
+        initialScale={1}
+        minScale={0.1}
+        maxScale={3}
+        limitToBounds={false}
+        centerOnInit={false}
+        panning={{ velocityDisabled: true }}
+        pinch={{ disabled: false }}
+        wheel={{ smoothStep: 0.05 }}
+        doubleClick={{ disabled: true }}
+        onTransformed={handleTransform}
       >
-        {/* Grid background in its own transform layer (scales with zoom) */}
-        <GridTransformLayer
-          $scale={scale}
-          $panX={panX}
-          $panY={panY}
-          data-testid="canvas-grid-layer"
-        >
-          <CanvasGrid
-            data-canvas-grid
-            data-testid="canvas-grid"
-          />
-        </GridTransformLayer>
-
-        {/* Loading indicator */}
-        {isLoading && (
-          <Loading data-testid="canvas-loading">Loading comments...</Loading>
-        )}
-
-        {/* Comments - at top level, don't scale with zoom */}
-        {mainComments.map((comment) => {
-          const screenPos = toScreenPosition(comment.x_coord, comment.y_coord);
-          const replies = repliesByParentId.get(comment.id) || [];
-          return (
-            <Comment
-              key={comment.id}
-              comment={comment}
-              replies={replies}
-              screenX={screenPos.x}
-              screenY={screenPos.y}
-            />
-          );
-        })}
-
-        {/* New comment form */}
-        {newCommentPosition && (
-          <CommentForm
-            screenX={toScreenPosition(newCommentPosition.x, newCommentPosition.y).x}
-            screenY={toScreenPosition(newCommentPosition.x, newCommentPosition.y).y}
-          />
-        )}
-      </CanvasContainer>
-
+        <CanvasContent
+          mainComments={mainComments}
+          repliesByParentId={repliesByParentId}
+          isLoading={isLoading}
+          scale={transformState.scale}
+          positionX={transformState.positionX}
+          positionY={transformState.positionY}
+        />
+      </TransformWrapper>
       {fixedUI}
     </>
   );
