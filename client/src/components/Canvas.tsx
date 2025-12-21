@@ -128,6 +128,7 @@ const Loading = styled.div`
 `;
 
 // Overlay for comments - sits on top of the transform layer
+// Uses a trick: pointer-events auto for clicks, but wheel events pass through
 const CommentsOverlay = styled.div`
   position: absolute;
   top: 0;
@@ -136,10 +137,11 @@ const CommentsOverlay = styled.div`
   height: 100%;
   pointer-events: none;
   z-index: 10;
+`
 
-  & > * {
-    pointer-events: auto;
-  }
+// Wrapper for each comment that captures clicks but passes wheel events through
+const CommentWrapper = styled.div`
+  pointer-events: auto;
 `;
 
 function BubbleIcon({ color = 'currentColor' }: { color?: string }) {
@@ -167,6 +169,7 @@ function CanvasContent({
   scale,
   positionX,
   positionY,
+  onWheel,
 }: {
   mainComments: CommentType[];
   repliesByParentId: Map<number, CommentType[]>;
@@ -174,6 +177,7 @@ function CanvasContent({
   scale: number;
   positionX: number;
   positionY: number;
+  onWheel: (e: React.WheelEvent) => void;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const hasCenteredOnComments = useRef(false);
@@ -262,21 +266,24 @@ function CanvasContent({
           const screenPos = toScreenPosition(comment.x_coord, comment.y_coord);
           const replies = repliesByParentId.get(comment.id) || [];
           return (
-            <Comment
-              key={comment.id}
-              comment={comment}
-              replies={replies}
-              screenX={screenPos.x}
-              screenY={screenPos.y}
-            />
+            <CommentWrapper key={comment.id} onWheel={onWheel}>
+              <Comment
+                comment={comment}
+                replies={replies}
+                screenX={screenPos.x}
+                screenY={screenPos.y}
+              />
+            </CommentWrapper>
           );
         })}
 
         {newCommentPosition && (
-          <CommentForm
-            screenX={toScreenPosition(newCommentPosition.x, newCommentPosition.y).x}
-            screenY={toScreenPosition(newCommentPosition.x, newCommentPosition.y).y}
-          />
+          <CommentWrapper onWheel={onWheel}>
+            <CommentForm
+              screenX={toScreenPosition(newCommentPosition.x, newCommentPosition.y).x}
+              screenY={toScreenPosition(newCommentPosition.x, newCommentPosition.y).y}
+            />
+          </CommentWrapper>
         )}
       </CommentsOverlay>
 
@@ -286,6 +293,7 @@ function CanvasContent({
 }
 
 export function Canvas() {
+  const transformRef = useRef<ReactZoomPanPinchRef>(null);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const { data, isLoading } = useComments();
@@ -293,6 +301,19 @@ export function Canvas() {
 
   // Local state for transform (synced to store)
   const [transformState, setTransformState] = useState({ scale: 1, positionX: 0, positionY: 0 });
+
+  // Handle wheel events globally on the canvas (including over comments)
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (!transformRef.current) return;
+    e.preventDefault();
+
+    const { zoomIn, zoomOut } = transformRef.current;
+    if (e.deltaY < 0) {
+      zoomIn(0.03, 0);
+    } else {
+      zoomOut(0.03, 0);
+    }
+  }, []);
 
   // Organize comments
   const { mainComments, repliesByParentId } = useMemo(() => {
@@ -347,14 +368,15 @@ export function Canvas() {
   return (
     <>
       <TransformWrapper
+        ref={transformRef}
         initialScale={1}
         minScale={0.1}
         maxScale={3}
         limitToBounds={false}
         centerOnInit={false}
         panning={{ velocityDisabled: true }}
-        pinch={{ disabled: false }}
-        wheel={{ smoothStep: 0.05 }}
+        pinch={{ step: 0.02 }}
+        wheel={{ step: 0.03, smoothStep: 0.01 }}
         doubleClick={{ disabled: true }}
         onTransformed={handleTransform}
       >
@@ -365,6 +387,7 @@ export function Canvas() {
           scale={transformState.scale}
           positionX={transformState.positionX}
           positionY={transformState.positionY}
+          onWheel={handleWheel}
         />
       </TransformWrapper>
       {fixedUI}
