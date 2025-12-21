@@ -453,7 +453,7 @@ export function Canvas() {
         limitToBounds={false}
         centerOnInit={false}
         panning={{ disabled: commentMode, velocityDisabled: true }}
-        pinch={{ step: 0.005 }}
+        pinch={{ step: 0.01 }}
         wheel={{ step: 0.01, smoothStep: 0.005 }}
         doubleClick={{ disabled: true }}
         onTransformed={handleTransform}

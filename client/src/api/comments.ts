@@ -41,7 +41,7 @@ export function useUpdateComment() {
       id,
       ...update
     }: UpdateCommentRequest & { id: number }): Promise<Comment> => {
-      const { data } = await apiClient.put<Comment>(`/comments/${id}`, update);
+      const { data } = await apiClient.patch<Comment>(`/comments/${id}`, update);
       return data;
     },
     onMutate: async ({ id, text_content }) => {
