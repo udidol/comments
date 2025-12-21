@@ -122,6 +122,7 @@ export function CommentForm({ screenX, screenY }: Props) {
       $screenX={screenX}
       $screenY={screenY}
       onClick={(e) => e.stopPropagation()}
+      data-comment
       data-testid="comment-form-container"
     >
       <form onSubmit={handleSubmit} data-testid="comment-form">

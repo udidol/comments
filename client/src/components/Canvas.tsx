@@ -1,13 +1,17 @@
-import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
-import { createPortal } from 'react-dom';
-import styled from 'styled-components';
-import { TransformWrapper, TransformComponent, useControls, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
-import { useCanvasStore } from '../store/canvasStore';
-import { useAuthStore } from '../store/authStore';
-import { useComments } from '../api/comments';
-import { Comment } from './Comment';
-import { CommentForm } from './CommentForm';
-import type { Comment as CommentType } from '@shared/types';
+import { useRef, useEffect, useMemo, useCallback, useState } from "react";
+import styled from "styled-components";
+import {
+  TransformWrapper,
+  TransformComponent,
+  useControls,
+  ReactZoomPanPinchRef,
+} from "react-zoom-pan-pinch";
+import { useCanvasStore } from "../store/canvasStore";
+import { useAuthStore } from "../store/authStore";
+import { useComments } from "../api/comments";
+import { Comment } from "./Comment";
+import { CommentForm } from "./CommentForm";
+import type { Comment as CommentType } from "@shared/types";
 
 // Container for the entire canvas area
 const CanvasWrapper = styled.div`
@@ -103,8 +107,8 @@ const AddCommentButton = styled.button<AddCommentButtonProps>`
   display: flex;
   align-items: center;
   gap: 8px;
-  background: ${(props) => (props.$active ? '#a78bfa' : 'white')};
-  color: ${(props) => (props.$active ? 'white' : '#888')};
+  background: ${(props) => (props.$active ? "#a78bfa" : "white")};
+  color: ${(props) => (props.$active ? "white" : "#888")};
   padding: 10px 20px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -113,7 +117,7 @@ const AddCommentButton = styled.button<AddCommentButtonProps>`
   font-size: 16px;
   font-family: inherit;
   &:hover {
-    background: ${(props) => (props.$active ? '#9061f9' : '#f5f5f5')};
+    background: ${(props) => (props.$active ? "#9061f9" : "#f5f5f5")};
   }
 `;
 
@@ -137,14 +141,15 @@ const CommentsOverlay = styled.div`
   height: 100%;
   pointer-events: none;
   z-index: 10;
-`
+`;
 
 // Wrapper for each comment that captures clicks but passes wheel events through
 const CommentWrapper = styled.div`
   pointer-events: auto;
+  touch-action: none;
 `;
 
-function BubbleIcon({ color = 'currentColor' }: { color?: string }) {
+function BubbleIcon({ color = "currentColor" }: { color?: string }) {
   return (
     <svg
       width="20"
@@ -170,6 +175,8 @@ function CanvasContent({
   positionX,
   positionY,
   onWheel,
+  commentMode,
+  setCommentMode,
 }: {
   mainComments: CommentType[];
   repliesByParentId: Map<number, CommentType[]>;
@@ -178,28 +185,30 @@ function CanvasContent({
   positionX: number;
   positionY: number;
   onWheel: (e: React.WheelEvent) => void;
+  commentMode: boolean;
+  setCommentMode: (active: boolean) => void;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const hasCenteredOnComments = useRef(false);
+  const justPlacedComment = useRef(false);
   const { setTransform } = useControls();
 
-  const {
-    selectComment,
-    setNewCommentPosition,
-    newCommentPosition,
-    commentMode,
-    setCommentMode,
-  } = useCanvasStore();
+  const { selectComment, setNewCommentPosition, newCommentPosition } =
+    useCanvasStore();
 
   // Center view on comments when they first load
   useEffect(() => {
-    if (mainComments.length && !hasCenteredOnComments.current && wrapperRef.current) {
+    if (
+      mainComments.length &&
+      !hasCenteredOnComments.current &&
+      wrapperRef.current
+    ) {
       hasCenteredOnComments.current = true;
 
-      const minX = Math.min(...mainComments.map(c => c.x_coord));
-      const maxX = Math.max(...mainComments.map(c => c.x_coord));
-      const minY = Math.min(...mainComments.map(c => c.y_coord));
-      const maxY = Math.max(...mainComments.map(c => c.y_coord));
+      const minX = Math.min(...mainComments.map((c) => c.x_coord));
+      const maxX = Math.max(...mainComments.map((c) => c.x_coord));
+      const minY = Math.min(...mainComments.map((c) => c.y_coord));
+      const maxY = Math.max(...mainComments.map((c) => c.y_coord));
 
       const centerX = (minX + maxX) / 2;
       const centerY = (minY + maxY) / 2;
@@ -213,20 +222,27 @@ function CanvasContent({
   }, [mainComments, setTransform]);
 
   // Convert canvas coordinates to screen position
-  const toScreenPosition = useCallback((x: number, y: number) => ({
-    x: x * scale + positionX,
-    y: y * scale + positionY,
-  }), [scale, positionX, positionY]);
+  const toScreenPosition = useCallback(
+    (x: number, y: number) => ({
+      x: x * scale + positionX,
+      y: y * scale + positionY,
+    }),
+    [scale, positionX, positionY]
+  );
 
-  const handleCanvasClick = (e: React.MouseEvent) => {
-    // Only handle clicks on the wrapper itself, not children
-    if (e.target !== e.currentTarget) return;
+  const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    // Don't handle clicks on comments
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-comment]")) return;
 
     if (commentMode) {
+      // Add comment mode: place new comment at click position
+      e.stopPropagation();
+      e.preventDefault();
+
       const rect = wrapperRef.current?.getBoundingClientRect();
       if (!rect) return;
 
-      // Convert screen position to canvas coordinates
       const screenX = e.clientX - rect.left;
       const screenY = e.clientY - rect.top;
       const canvasX = (screenX - positionX) / scale;
@@ -234,27 +250,42 @@ function CanvasContent({
 
       setNewCommentPosition({ x: canvasX, y: canvasY });
       setCommentMode(false);
-    } else {
-      selectComment(null);
-      setNewCommentPosition(null);
+      justPlacedComment.current = true;
     }
+  };
+
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    // Skip if we just placed a comment (mousedown already handled it)
+    if (justPlacedComment.current) {
+      justPlacedComment.current = false;
+      return;
+    }
+
+    // Don't handle clicks on comments
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-comment]")) return;
+
+    // Normal mode: deselect
+    selectComment(null);
+    setNewCommentPosition(null);
   };
 
   return (
     <CanvasWrapper
       ref={wrapperRef}
+      onMouseDownCapture={handleCanvasMouseDown}
       onClick={handleCanvasClick}
-      style={{ cursor: commentMode ? 'crosshair' : 'grab' }}
+      style={{ cursor: commentMode ? "crosshair" : "grab" }}
     >
       {/* The zoom/pan layer - ONLY contains the grid */}
       <TransformComponent
         wrapperStyle={{
-          width: '100%',
-          height: '100%',
+          width: "100%",
+          height: "100%",
         }}
         contentStyle={{
-          width: '100%',
-          height: '100%',
+          width: "100%",
+          height: "100%",
         }}
       >
         <CanvasGrid />
@@ -280,8 +311,12 @@ function CanvasContent({
         {newCommentPosition && (
           <CommentWrapper onWheel={onWheel}>
             <CommentForm
-              screenX={toScreenPosition(newCommentPosition.x, newCommentPosition.y).x}
-              screenY={toScreenPosition(newCommentPosition.x, newCommentPosition.y).y}
+              screenX={
+                toScreenPosition(newCommentPosition.x, newCommentPosition.y).x
+              }
+              screenY={
+                toScreenPosition(newCommentPosition.x, newCommentPosition.y).y
+              }
             />
           </CommentWrapper>
         )}
@@ -300,30 +335,80 @@ export function Canvas() {
   const { commentMode, setCommentMode, setScale, setPan } = useCanvasStore();
 
   // Local state for transform (synced to store)
-  const [transformState, setTransformState] = useState({ scale: 1, positionX: 0, positionY: 0 });
+  const [transformState, setTransformState] = useState({
+    scale: 1,
+    positionX: 0,
+    positionY: 0,
+  });
 
-  // Handle wheel events globally on the canvas (including over comments)
+  const MIN_SCALE = 0.3;
+  const MAX_SCALE = 2.5;
+
+  // Handle wheel/pinch events globally on the canvas (including over comments)
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (!transformRef.current) return;
     e.preventDefault();
+    e.stopPropagation();
 
+    const currentScale = transformRef.current.state.scale;
     const { zoomIn, zoomOut } = transformRef.current;
-    if (e.deltaY < 0) {
-      zoomIn(0.03, 0);
-    } else {
-      zoomOut(0.03, 0);
+
+    if (e.deltaY < 0 && currentScale < MAX_SCALE) {
+      zoomIn(0.01, 0);
+    } else if (e.deltaY > 0 && currentScale > MIN_SCALE) {
+      zoomOut(0.01, 0);
     }
+  }, []);
+
+  // Prevent browser zoom and handle pinch gestures globally
+  useEffect(() => {
+    const handleGlobalWheel = (e: WheelEvent) => {
+      // Trackpad pinch comes as wheel with ctrlKey
+      if (e.ctrlKey) {
+        e.preventDefault();
+        if (!transformRef.current) return;
+
+        const currentScale = transformRef.current.state.scale;
+        const { zoomIn, zoomOut } = transformRef.current;
+
+        if (e.deltaY < 0 && currentScale < MAX_SCALE) {
+          zoomIn(0.01, 0);
+        } else if (e.deltaY > 0 && currentScale > MIN_SCALE) {
+          zoomOut(0.01, 0);
+        }
+      }
+    };
+
+    const preventGesture = (e: Event) => {
+      e.preventDefault();
+    };
+
+    document.addEventListener("wheel", handleGlobalWheel, { passive: false });
+    document.addEventListener("gesturestart", preventGesture);
+    document.addEventListener("gesturechange", preventGesture);
+    document.addEventListener("gestureend", preventGesture);
+
+    return () => {
+      document.removeEventListener("wheel", handleGlobalWheel);
+      document.removeEventListener("gesturestart", preventGesture);
+      document.removeEventListener("gesturechange", preventGesture);
+      document.removeEventListener("gestureend", preventGesture);
+    };
   }, []);
 
   // Organize comments
   const { mainComments, repliesByParentId } = useMemo(() => {
-    if (!data?.data) return { mainComments: [], repliesByParentId: new Map<number, CommentType[]>() };
+    if (!data?.data)
+      return {
+        mainComments: [],
+        repliesByParentId: new Map<number, CommentType[]>(),
+      };
 
     const main: CommentType[] = [];
     const replies = new Map<number, CommentType[]>();
 
     for (const comment of data.data) {
-      if (comment.type === 'comment') {
+      if (comment.type === "comment") {
         main.push(comment);
       } else if (comment.parent_id) {
         const existing = replies.get(comment.parent_id) || [];
@@ -335,8 +420,8 @@ export function Canvas() {
     return { mainComments: main, repliesByParentId: replies };
   }, [data?.data]);
 
-  const handleAddCommentClick = () => {
-    setCommentMode(true);
+  const toggleCommentMode = () => {
+    setCommentMode(!commentMode);
   };
 
   const handleTransform = (ref: ReactZoomPanPinchRef) => {
@@ -348,8 +433,7 @@ export function Canvas() {
 
   const zoomPercent = Math.round(transformState.scale * 100);
 
-  // Fixed UI - rendered via portal, completely outside transform system
-  const fixedUI = createPortal(
+  return (
     <>
       <Toolbar>
         <UserInfo>Signed in as {user?.username}</UserInfo>
@@ -357,26 +441,20 @@ export function Canvas() {
       </Toolbar>
       <ZoomLevel>{zoomPercent}%</ZoomLevel>
       <HelpText>Drag to pan | Scroll to zoom</HelpText>
-      <AddCommentButton onClick={handleAddCommentClick} $active={commentMode}>
-        <BubbleIcon color={commentMode ? 'white' : '#888'} />
+      <AddCommentButton onClick={toggleCommentMode} $active={commentMode}>
+        <BubbleIcon color={commentMode ? "white" : "#888"} />
         <span>Add comment</span>
       </AddCommentButton>
-    </>,
-    document.body
-  );
-
-  return (
-    <>
       <TransformWrapper
         ref={transformRef}
         initialScale={1}
-        minScale={0.1}
-        maxScale={3}
+        minScale={0.3}
+        maxScale={2.5}
         limitToBounds={false}
         centerOnInit={false}
-        panning={{ velocityDisabled: true }}
-        pinch={{ step: 0.02 }}
-        wheel={{ step: 0.03, smoothStep: 0.01 }}
+        panning={{ disabled: commentMode, velocityDisabled: true }}
+        pinch={{ step: 0.005 }}
+        wheel={{ step: 0.01, smoothStep: 0.005 }}
         doubleClick={{ disabled: true }}
         onTransformed={handleTransform}
       >
@@ -388,9 +466,10 @@ export function Canvas() {
           positionX={transformState.positionX}
           positionY={transformState.positionY}
           onWheel={handleWheel}
+          commentMode={commentMode}
+          setCommentMode={setCommentMode}
         />
       </TransformWrapper>
-      {fixedUI}
     </>
   );
 }

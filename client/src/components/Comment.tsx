@@ -682,6 +682,7 @@ export function Comment({ comment, replies, screenX, screenY }: Props) {
         onClick={handleAvatarClick}
         $screenX={screenX}
         $screenY={screenY}
+        data-comment
         data-testid={`comment-avatar-${comment.id}`}
       >
         <AvatarInner $color={userColor} data-testid={`comment-avatar-inner-${comment.id}`}>
@@ -700,6 +701,7 @@ export function Comment({ comment, replies, screenX, screenY }: Props) {
       onClick={(e) => e.stopPropagation()}
       $screenX={screenX}
       $screenY={screenY}
+      data-comment
       data-testid={`comment-container-${comment.id}`}
     >
       {/* Header */}
