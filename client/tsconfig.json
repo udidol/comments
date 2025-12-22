@@ -17,11 +17,11 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
-	"typeRoots": ["./node_modules/@types"],
+    "typeRoots": ["./node_modules/@types"],
     "paths": {
-	  "react": ["./node_modules/@types/react"],
-	  "react-dom": ["./node_modules/@types/react-dom"],
-      "@shared/*": ["../shared/*"],
+      "react": ["./node_modules/@types/react"],
+      "react-dom": ["./node_modules/@types/react-dom"],
+      "@shared/*": ["../shared/*"]
     }
   },
   "include": ["src", "../shared"],

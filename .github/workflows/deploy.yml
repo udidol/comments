@@ -34,6 +34,8 @@ jobs:
           # Use the local bin directly to avoid npx resolution issues
           ./node_modules/.bin/tsc
           ./node_modules/.bin/vite build
+        env:
+          BASE_PATH: ${{ secrets.BASE_PATH }}
 
       # Build Backend
       - name: Install backend dependencies
