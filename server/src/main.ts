@@ -4,8 +4,6 @@ import { join } from "path";
 // Load .env from project root
 config({ path: join(process.cwd(), "..", ".env") });
 
-import { resolve } from "path";
-
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "./app.module";

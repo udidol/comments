@@ -1,7 +1,7 @@
 import styled from 'styled-components';
 import { useAuthStore } from './store/authStore';
-import { LoginForm } from './components/LoginForm';
-import { Canvas } from './components/Canvas';
+import { LoginForm } from './components/LoginForm/LoginForm';
+import { Canvas } from './components/Canvas/Canvas';
 
 const AppContainer = styled.div`
   width: 100%;

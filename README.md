@@ -4,9 +4,9 @@ A Figma-like web application featuring an infinite canvas with a collaborative c
 
 ## Tech Stack
 
-- **Backend**: NestJS, SQLite (sqlite3), Passport JWT, Throttler
-- **Frontend**: React, TypeScript, Zustand, TanStack Query, styled-components
-- **Shared**: TypeScript types between frontend and backend
+-   **Backend**: NestJS, SQLite (sqlite3), Passport JWT, Throttler
+-   **Frontend**: React, TypeScript, Zustand, TanStack Query, styled-components
+-   **Shared**: TypeScript types between frontend and backend
 
 ## Project Structure
 
@@ -26,8 +26,8 @@ comments/
 
 ### Prerequisites
 
-- Node.js 18+
-- npm 9+
+-   Node.js 18+
+-   npm 9+
 
 ### Installation
 
@@ -67,43 +67,43 @@ npm run build
 
 This creates:
 
-- `client/dist/` - Static frontend files
-- `server/dist/` - Compiled backend JavaScript
+-   `client/dist/` - Static frontend files
+-   `server/dist/` - Compiled backend JavaScript
 
 ### Deploying to a Remote Server (FTP)
 
 1. **Build locally first**:
 
-   ```bash
-   npm run build
-   ```
+    ```bash
+    npm run build
+    ```
 
 2. **Upload only these files/folders**:
 
-   ```
-   comments/
-   ├── package.json           # Root scripts
-   ├── server/
-   │   ├── package.json       # Server dependencies
-   │   └── dist/              # Compiled backend (entire folder)
-   └── client/
-       └── dist/              # Built frontend (entire folder)
-   ```
+    ```
+    comments/
+    ├── package.json           # Root scripts
+    ├── server/
+    │   ├── package.json       # Server dependencies
+    │   └── dist/              # Compiled backend (entire folder)
+    └── client/
+        └── dist/              # Built frontend (entire folder)
+    ```
 
-   **Do NOT upload**: `node_modules/`, `src/` folders, `.git/`, `shared/`
+    **Do NOT upload**: `node_modules/`, `src/` folders, `.git/`, `shared/`
 
 3. **On the server**, navigate to the project root and run:
 
-   ```bash
-   # Install production dependencies
-   npm run install:prod
+    ```bash
+    # Install production dependencies
+    npm run install:prod
 
-   # Create .env with a secure JWT secret
-   echo "JWT_SECRET=$(node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\")" > .env
+    # Create .env with a secure JWT secret
+    echo "JWT_SECRET=$(node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\")" > .env
 
-   # Start the production server
-   npm start
-   ```
+    # Start the production server
+    npm start
+    ```
 
 The database initializes automatically on first startup (creates schema + seed users).
 The server runs on port 3000 and serves both the API and frontend.
@@ -142,3 +142,11 @@ npm start
 ## Rate Limiting
 
 The API is rate-limited to 10 requests per minute per IP. Exceeding this limit returns a 429 status with the message: "Haha nice try DoSing, NO SOUP FOR YOU!"
+
+## Things to add
+
+There are many things to improve in UI, like smooth zooming, element design, but those are less important.
+
+On the server side, this is a demo so I didn't put too much effort into security. If this was a real API, I'd invest in a solid CSP, sanitize inputs thoroughly, restrict CORS, add security headers to responses, and more.
+
+I'd also add some improvements like handling the pagination on the client, decide when to keep fetching etc. This is definitely not prod-ready.
