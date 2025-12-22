@@ -121,14 +121,14 @@ export function CommentForm({ screenX, screenY }: Props) {
     <Container
       $screenX={screenX}
       $screenY={screenY}
-      onClick={(e) => e.stopPropagation()}
+      onClick={(e: React.MouseEvent) => e.stopPropagation()}
       data-comment
       data-testid="comment-form-container"
     >
       <form onSubmit={handleSubmit} data-testid="comment-form">
         <Textarea
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Add a comment..."
           autoFocus
