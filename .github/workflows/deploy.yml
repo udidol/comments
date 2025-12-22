@@ -56,6 +56,8 @@ jobs:
 
           # Copy .htaccess for Apache protection
           cp .htaccess deploy/
+          cp package.json deploy/
+          cp package-lock.json deploy/
 
           # Copy server files (will be protected by .htaccess)
           mkdir -p deploy/server
