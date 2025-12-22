@@ -107,7 +107,7 @@ export function LoginForm() {
           type="text"
           placeholder="Username"
           value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
           autoFocus
           data-testid="login-username-input"
         />
@@ -115,7 +115,7 @@ export function LoginForm() {
           type="password"
           placeholder="Password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
           data-testid="login-password-input"
         />
         <Button

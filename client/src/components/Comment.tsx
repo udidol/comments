@@ -508,8 +508,8 @@ function Reply({ reply }: { reply: CommentType }) {
         <EditContainer data-testid={`reply-edit-container-${reply.id}`}>
           <ReplyTextarea
             value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-            onKeyDown={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditText(e.target.value)}
+            onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSave(); }
               if (e.key === 'Escape') { setEditText(reply.text_content); setIsEditing(false); }
             }}
@@ -698,7 +698,7 @@ export function Comment({ comment, replies, screenX, screenY }: Props) {
   // Open state
   return (
     <CommentContainer
-      onClick={(e) => e.stopPropagation()}
+      onClick={(e: React.MouseEvent) => e.stopPropagation()}
       $screenX={screenX}
       $screenY={screenY}
       data-comment
@@ -758,7 +758,7 @@ export function Comment({ comment, replies, screenX, screenY }: Props) {
           <Textarea
             ref={textareaRef}
             value={editText}
-            onChange={(e) => setEditText(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditText(e.target.value)}
             onKeyDown={handleKeyDown}
             data-testid={`comment-edit-textarea-${comment.id}`}
           />
@@ -802,7 +802,7 @@ export function Comment({ comment, replies, screenX, screenY }: Props) {
         <ReplyInput
           type="text"
           value={replyText}
-          onChange={(e) => setReplyText(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setReplyText(e.target.value)}
           onKeyDown={handleReplyKeyDown}
           placeholder="Reply..."
           data-testid={`comment-reply-input-${comment.id}`}
