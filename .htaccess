@@ -5,6 +5,11 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Proxy API requests to backend server
+    # This forwards /api/* or /app/path/api/* to http://localhost:3000/api/*
+    RewriteCond %{REQUEST_URI} /api/
+    RewriteRule ^(.*)api/(.*)$ http://localhost:3000/api/$2 [P,L]
+
     # Block access to server directory
     RewriteRule ^server/ - [F,L]
 
