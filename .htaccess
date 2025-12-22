@@ -1,0 +1,44 @@
+# Deny access to all directories by default
+Options -Indexes
+
+# Protect sensitive directories
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Block access to server directory
+    RewriteRule ^server/ - [F,L]
+
+    # Block access to node_modules
+    RewriteRule ^node_modules/ - [F,L]
+
+    # Block access to database files
+    RewriteRule ^.*\.db$ - [F,L]
+    RewriteRule ^.*\.sqlite$ - [F,L]
+
+    # Block access to config/env files
+    RewriteRule ^\.env - [F,L]
+    RewriteRule ^.*\.log$ - [F,L]
+
+    # Block access to package files
+    RewriteRule ^package\.json$ - [F,L]
+    RewriteRule ^package-lock\.json$ - [F,L]
+    RewriteRule ^tsconfig\.json$ - [F,L]
+
+    # Serve client app - route all non-file requests to index.html (for SPA routing)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} !^/api/
+    RewriteRule ^(.*)$ /index.html [L]
+</IfModule>
+
+# Block access to hidden files (starting with .)
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Block access to specific file types
+<FilesMatch "\.(ts|tsx|md|sql|sh)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
