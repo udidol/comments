@@ -2,6 +2,8 @@
 
 A Figma-like web application featuring an infinite canvas with a collaborative commenting system. Users can authenticate, pan and zoom around the canvas, and place comments at any position. Comments support threaded replies, editing, and deletion with ownership-based permissions. Built with a NestJS backend using SQLite for persistence and a React frontend with Zustand for state management.
 
+<img width="2048" height="991" alt="image" src="https://github.com/user-attachments/assets/cdd9a77e-7334-4932-b799-49b45ca5e3e1" />
+
 ## Tech Stack
 
 -   **Backend**: NestJS, SQLite (sqlite3), Passport JWT, Throttler
@@ -143,10 +145,21 @@ npm start
 
 The API is rate-limited to 10 requests per minute per IP. Exceeding this limit returns a 429 status with the message: "Haha nice try DoSing, NO SOUP FOR YOU!"
 
-## Things to add
-
+## Optimizations for scale, security, production
+### UI
 There are many things to improve in UI, like smooth zooming, element design, but those are less important.
 
+#### Security
 On the server side, this is a demo so I didn't put too much effort into security. If this was a real API, I'd invest in a solid CSP, sanitize inputs thoroughly, restrict CORS, add security headers to responses, and more.
 
-I'd also add some improvements like handling the pagination on the client, decide when to keep fetching etc. This is definitely not prod-ready.
+#### Scale
+For performance in scale I'd serve assets from CDN, add an in-memory DB like redis for query caching, add multiple servers with load balancing, and, if necessary, load handling by queue, all the fluff.
+
+#### Performance optimizations
+1. Dividing the canvas - quadtree strategy
+    - If the document is huge with a lot of comments, fetch comments only for the part of the screen that the user is in at that moment. When the user pans/zooms, fetch only the relevant comments in real time.
+2. Using protobuf - to make response payloads significantly smaller, protobuf protocol could be used for data transfer.
+3. Split data fetching for efficient initial load
+    1. Initially fetch only the necessary data for displaying the comment markers in the canvas, and after that request is fetched, trigger an asynchronous fetching of the actual comments.
+    2. Another optimization is to only fetch comments, without replies, and fetch the replies afterwards, asynchronously.
+    3. I implemented pagination for the `GET /comments` endpoint,so the pagination mechanism can be used to do a waterfall fetch of all data asynchronously until all comments are fetched
